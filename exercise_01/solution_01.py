@@ -77,12 +77,18 @@ def main(args):
     # transaction outs
     vout = pd.concat(df.apply(lambda tx: pd.json_normalize(tx.loc["vout"]).assign(tx_0=tx['txid']), axis=1).tolist(),ignore_index=True)
     
-    n_txs_in =  len(vout[vout.loc[:,'scriptpubkey_address'] == addr].tx_0.unique()) # addr_info['chain_stats']['funded_txo_count']
-    n_txs_out = len(vin[vin.loc[:,'prevout.scriptpubkey_address'] == addr].tx_0.unique()) # addr_info['chain_stats']['spent_txo_count']
-    n_txs_out_alternative =  addr_info['chain_stats']['spent_txo_count']
+    #n_txs_in =  len(vout[vout.loc[:,'scriptpubkey_address'] == addr].tx_0.unique()) # addr_info['chain_stats']['funded_txo_count']
+    #n_txs_out = len(vin[vin.loc[:,'prevout.scriptpubkey_address'] == addr].tx_0.unique()) # addr_info['chain_stats']['spent_txo_count']
+    #n_txs_out_alternative =  addr_info['chain_stats']['spent_txo_count']
 
-    n_neighbors_in = len(vin.loc[vin.tx_0.isin(vout.loc[vout["scriptpubkey_address"] == addr,"tx_0"]),"prevout.scriptpubkey_address"].unique())
-    n_neighbors_out = len(vout.loc[vout.tx_0.isin(vin.loc[vin["prevout.scriptpubkey_address"] == addr,"tx_0"]),"scriptpubkey_address"].unique())
+    n_neighbors_out = len(vin.loc[vin.tx_0.isin(vout.loc[vout["scriptpubkey_address"] == addr,"tx_0"]),"prevout.scriptpubkey_address"].unique())
+    n_neighbors_in = len(vout.loc[vout.tx_0.isin(vin.loc[vin["prevout.scriptpubkey_address"] == addr,"tx_0"]),"scriptpubkey_address"].unique())
+
+    # via prevout.scriptpubkey instead of scriptpubkey_address
+    scriptpubkey = vout.loc[vout["scriptpubkey_address"] == addr, "scriptpubkey"].unique()[0]
+    n_neighbors_out_s = len(vin.loc[vin.tx_0.isin(vout.loc[vout["scriptpubkey"] == scriptpubkey,"tx_0"]),"prevout.scriptpubkey"].unique())
+    n_neighbors_in_s = len(vout.loc[vout.tx_0.isin(
+        vin.loc[vin["prevout.scriptpubkey"] == scriptpubkey, "tx_0"]), "scriptpubkey"].unique())
 
     satoshi_in =  vout[vout.loc[:, 'scriptpubkey_address'] == addr]['value'].sum() # addr_info['chain_stats']['funded_txo_sum']
     satoshi_out =  vin[vin.loc[:, 'prevout.scriptpubkey_address'] == addr]['prevout.value'].sum() # addr_info['chain_stats']['spent_txo_sum'] 

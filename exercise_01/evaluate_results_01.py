@@ -1,74 +1,131 @@
-from argparse import ArgumentParser
-
+import subprocess
 import pandas as pd
 import glob
 import os
+from argparse import ArgumentParser
 
 def main(args):
 
-    solution_json = args.solution
-    alternative_json = args.alternative
-    result_dir = args.results
-    output_file = args.output
+    # get all directories from "../../submissions/exercise_01/submitted"
+    l_dir = glob.glob("../../submissions/exercise_01/submitted/*")
+    path_results = "../../submissions/exercise_01/results/"
 
-	# introduce weights (points)
-    weights = pd.Series(data = {'n_txs_in':0.4, 'n_txs_out':0.4, 'satoshi_in':0.4, 'satoshi_out':0.4, 'balance':0.2,
-       't_block_in_first':0.8, 't_block_out_last':0.8, 'n_addr_reused':0.8, 'fees':0.8})
-
-	# read result, rename misspelling columns
-    df_solution = pd.read_json(solution_json, orient = 'index', typ = "series").to_frame().T \
-        .rename(columns={'t_block_in_frist': 't_block_in_first'}) \
-        .rename(columns={'t_block_last_out': 't_block_out_last'})
-
-    # read alternative solution
-    if(alternative_json is None):
-        df_alternative = df_solution.copy
+    if args.address is not None:
+        test_addr = args.address
     else:
-        df_alternative = pd.read_json(alternative_json, orient = 'index', typ = "series").to_frame().T \
-        .rename(columns={'t_block_in_frist': 't_block_in_first'}) \
-        .rename(columns={'t_block_last_out': 't_block_out_last'})
+        test_addr = "12sENwECeRSmTeDwyLNqwh47JistZqFmW8"
 
-    def extract_json(file):
-        name_number = os.path.basename(file).split(".", 1)[0].split("_")[0:2]
-        return pd.read_json(file, orient='index', typ="series").to_frame().T\
-        .assign(name=name_number[0], martrikelnummer=name_number[1])\
-        .rename(columns={'t_block_in_frist':'t_block_in_first'}) \
-        .rename(columns={'t_block_last_out': 't_block_out_last'})
+    # create a list for the resutls to concat later
+    l_df = []
 
-	# get json files, extract them and concate them
-    df_results = pd.concat(list(map(extract_json,glob.glob(result_dir, recursive = True))), ignore_index= True)
+    # for each l_dir list entry, ...
+    for dir in l_dir:
+        # get the names and matriculation numbers
+        name = os.path.basename(dir).split("_")[0]
+        matr = os.path.basename(dir).split("_")[1]
 
-	# check the student solution !!+ alternative solution!
-    for c in df_solution.columns.to_list():
-        df_results.loc[:, str(c)+"_CHECK"] = ((df_results.loc[:,c] == df_solution.loc[0,c]) |
-                                              (df_results.loc[:,c] == df_alternative.loc[0,c])) * weights[c]
-    #### correct this!
-    col = df_solution.columns.to_list()
-    col_check = [c+"_CHECK" for c in col]
-    col = col + col_check
-    col.sort()
+        # get the contained python files
+        py_files = glob.glob(dir + "/*.py")
 
-    df_results.loc[:,"sum"] = df_results.loc[:,col_check].sum(axis = 1)
+        # if more than one python file is found, print a warning
+        if len(py_files) > 1:
+            print("Warning: More than one python file found in directory " + dir)
+        else:
+            # take the first python file
+            py_file = py_files[0]
+            out_file = path_results + "/out_" + name.replace(" ","") + "_" + matr + ".json"
 
-    df_results.loc[:,["martrikelnummer","name","sum"] + col].sort_values("martrikelnummer")\
-        .reset_index(drop = True)\
-        .to_csv(output_file)
+            cmd = "python '" + \
+                  os.path.abspath(py_file) + \
+                  "' --address " + test_addr + \
+                  " --output '" +os.path.abspath(out_file) +"'"
+            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+            (output, err) = p.communicate()
+            p_status = p.wait()
+
+            # print error message, if any
+            if err is not None:
+                print("Error " + name + ": " + err)
+
+            # read output file
+            try:
+                df = pd.read_json(out_file, orient = 'index', typ = "series").to_frame().T
+            except:
+                df = pd.DataFrame()
+            # add name and matriculation number
+            df['name'] = name
+            df['matr'] = matr
+
+            df.rename(columns={'n_neighbors_in':'n_neighbours_in'}, inplace=True)
+            df.rename(columns={'n_neighbors_out':'n_neighbours_out'}, inplace=True)
+
+            # add to list
+            l_df.append(df)
+
+    # run solution
+    output_solution = path_results + "/solution.json"
+    cmd = "python 'solution_01.py' " \
+          "--address "+ test_addr + " " \
+          "--output '" + os.path.abspath(output_solution) + "'"
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+    (output, err) = p.communicate()
+    p_status = p.wait()
+
+
+
+    # concat all data frames
+    df = pd.concat(l_df, ignore_index=True)
+
+    # compare student results with solution
+    # print error message, if any
+    if err is not None:
+        print("Error " + name + ": " + err)
+
+    # read output file
+    df_solution = pd.read_json(output_solution, orient = 'index', typ = "series").to_frame().T
+    df_solution['name'] = "SOLUTION"
+    df_solution['matr'] = "SOLUTION"
+
+    # introduce weights (points)
+    weights = pd.Series(data={'satoshi_in': 0.4, 'satoshi_out': 0.4, 'balance': 0.2, 'fees': 1.,
+                              'b_in_first': 0.5, 'b_out_first': 0.5, 'n_neighbours_in': 1., 'n_neighbours_out': 1.})
+
+    # go through all columns of solution and compare with student results
+    l_result_cols = []
+    df["comment"] = ""
+    for i, col in enumerate(df_solution.columns):
+        if col not in ['name', 'matr']:
+            # get the column of the solution
+            col_solution = df_solution[col].iloc[0]
+            # get the column of the student results
+            col_student = df[col]
+            # compare the two columns
+            result_col_name = 'p_' + str(i) + "_" + col
+            l_result_cols.append(result_col_name)
+            correct = (col_solution == col_student)
+            df[result_col_name] = (correct) * weights[col]
+            df.loc[(~correct) ,"comment"] = df.loc[(~correct), "comment"] + \
+                                    "Correct solution for '" + col + "' should be " + str(col_solution) + "\n"
+    # row sum of the results
+    df["points"] = df.loc[:, l_result_cols].sum(axis=1)
+    df.loc[df["points"] == 5, "comment"] = "Well done!"
+
+    # save results
+    # reorder columns: name, matr, points, comment, all other columns
+    cols_reorder = df.columns.tolist()
+    [cols_reorder.remove(c) if (c in cols_reorder) else None for c in ['name', 'matr', 'points', 'comment']]
+    cols_reorder = ['name', 'matr', 'points', 'comment'] + cols_reorder
+
+    df.loc[:, cols_reorder].to_csv(path_results + "/results_"+test_addr+".csv", index=False)
+
+    print("Test address: " + test_addr)
+
 
 if __name__ == '__main__':
-
     parser = ArgumentParser()
-    parser.add_argument('-o', '--output',
-                        help='Output file path (CSV)', type=str,
-                        required=True)
-    parser.add_argument('-s', '--solution',
-                        help='Input file path (JSON)', type=str,
-                        required=True)
-    parser.add_argument('-a', '--alternative',
-                        help='Input file path (JSON)', type=str,
-                        required=False)
-    parser.add_argument('-r', '--results',
-                        help='Input dir path (*.JSON)', type=str,
-                        required=True)
+    parser.add_argument('-a', '--address',
+                        help='BTC address for computing statistics statistics',
+                        type=str, required=True)
     args = parser.parse_args()
-
     main(args)
+

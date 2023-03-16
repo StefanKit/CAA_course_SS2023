@@ -2,13 +2,13 @@ submission_folder="../../submissions/exercise_01"
 code_path=`pwd`
 
 # activate python envir
-. ../../venc-caa/bin/activate
+conda activate caa_venv
 
 
 cd $submission_folder
 
 # unzip if necessary
-zip_files=`find ./submitted/*/*.zip`
+files=`find ./submitted/*/*.py`
 echo "# unzip"
 for z in $zip_files
 do
@@ -18,16 +18,6 @@ do
 	student=$(echo $dir | awk -F "/" '{print $3}' | awk -F "_" '{print $1}')	
 	
 done
-
-
-## requirements
-# find all requirement files and paste them
-find ./submitted/*/requirements.txt -exec cat {} + > requirements.txt
-# edit them manually
-nano requirements.txt
-cat requirements.txt | echo
-# install requirements
-pip install -r requirements.txt
 
 # replace spaces in path
 find "./submitted/" -type d -name "* *" -print0 -exec bash -c 'mv "$0" "${0// /_}"' {} \;
@@ -54,7 +44,7 @@ done
 
 # run solution to get verification reference
 python ${code_path}/solution_01.py -a $parameter_a -o "out_solution_01_${parameter_a}.json"
-python ${code_path}/alternative_01.py -a $parameter_a -o "out_alternative_01_${parameter_a}.json"
+# python ${code_path}/alternative_01.py -a $parameter_a -o "out_alternative_01_${parameter_a}.json"
 
 python ${code_path}/evaluate_results_01.py -r "./results/*.json" -s "out_solution_01_${parameter_a}.json" -a "out_alternative_01_${parameter_a}.json" -o "./evaluation_${parameter_a}.csv"
 
