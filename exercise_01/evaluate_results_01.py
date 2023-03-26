@@ -92,7 +92,7 @@ def main(args):
 
     # go through all columns of solution and compare with student results
     l_result_cols = []
-    df["comment"] = ""
+    df["comment"] = "Tested with: " + test_addr + "\n"
     for i, col in enumerate(df_solution.columns):
         if col not in ['name', 'matr']:
             # get the column of the solution
@@ -105,7 +105,7 @@ def main(args):
             correct = (col_solution == col_student)
             df[result_col_name] = (correct) * weights[col]
             df.loc[(~correct) ,"comment"] = df.loc[(~correct), "comment"] + \
-                                    "Correct solution for '" + col + "' should be " + str(col_solution) + "\n"
+                                    "The correct solution for '" + col + "' should be " + str(col_solution) + "\n"
     # row sum of the results
     df["points"] = df.loc[:, l_result_cols].sum(axis=1)
     df.loc[df["points"] == 5, "comment"] = "Well done!"

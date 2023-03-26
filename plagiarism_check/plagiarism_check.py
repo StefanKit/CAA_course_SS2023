@@ -3,6 +3,7 @@ import subprocess
 from argparse import ArgumentParser
 import pandas as pd
 import csv
+import glob
 
 # python3 code/exercise_03/plagiarism_check.py
 # -f submissions/exercise_03/all_scripts
@@ -18,15 +19,13 @@ def main(args):
     col1=[]
     col2=[]
     col3=[]
-    for script in os.listdir(folder):
-        f = os.path.join(folder, script)
-        if(f.endswith(".py")):
-            allscripts.append(f)
+
+    allscripts = glob.glob(f"{folder}/*/*.py")
     for i in range(len(allscripts)-1):
         for j in range(i+1,len(allscripts)):
             student1 = allscripts[i].split(os.path.sep)[-1].split('_')[2]
             student2 = allscripts[j].split(os.path.sep)[-1].split('_')[2]
-            command = "pycode_similar "+ allscripts[i]+" "+allscripts[j]
+            command = "python3 pycode_similar.py '"+ allscripts[i]+"' '"+allscripts[j]+"'"
             try:
                 o = subprocess.check_output(command,shell=True,stderr=subprocess.STDOUT)
             except subprocess.CalledProcessError:
